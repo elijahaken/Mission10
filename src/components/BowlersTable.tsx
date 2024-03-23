@@ -12,15 +12,22 @@ interface IBowler {
   bowlerZip?: string;
   bowlerPhoneNumber?: string;
   teamId?: number;
-  // Assuming you do not need to include bowlerScores in the interface for your table
-  // If the API returns a team object as well, include it
   team?: ITeam;
 }
 
 interface ITeam {
   teamId: number;
   teamName: string;
-  // captainId and other properties can be added if they are included in your API response
+  bowlers?: {
+    // Define the nested bowlers inside team
+    $id: string;
+    $values: IBowler[];
+  };
+}
+
+interface IApiResponse {
+  $id: string;
+  $values: IBowler[];
 }
 
 function BowlersTable() {
@@ -28,9 +35,28 @@ function BowlersTable() {
 
   useEffect(() => {
     axios
-      .get<IBowler[]>('https://localhost:44336/api/Bowlers')
+      .get<IApiResponse>('https://localhost:44336/api/Bowlers')
       .then((response) => {
-        setBowlers(response.data);
+        const uniqueBowlers = new Map<number, IBowler>();
+
+        response.data.$values.forEach((bowler) => {
+          uniqueBowlers.set(bowler.bowlerId, bowler);
+
+          // Check if the bowler's team and the team's bowlers are defined
+          if (
+            bowler.team &&
+            bowler.team.bowlers &&
+            bowler.team.bowlers.$values
+          ) {
+            bowler.team.bowlers.$values.forEach((teamBowler) => {
+              if (!uniqueBowlers.has(teamBowler.bowlerId)) {
+                uniqueBowlers.set(teamBowler.bowlerId, teamBowler);
+              }
+            });
+          }
+        });
+
+        setBowlers(Array.from(uniqueBowlers.values()));
       })
       .catch((error) => {
         console.error('There was an error fetching the bowlers:', error);
@@ -53,13 +79,13 @@ function BowlersTable() {
       <tbody>
         {bowlers.map((bowler) => (
           <tr key={bowler.bowlerId}>
-            <td>{`${bowler.bowlerFirstName} ${bowler.bowlerMiddleInit} ${bowler.bowlerLastName}`}</td>
-            <td>{bowler.team?.teamName}</td>
-            <td>{bowler.bowlerAddress}</td>
-            <td>{bowler.bowlerCity}</td>
-            <td>{bowler.bowlerState}</td>
-            <td>{bowler.bowlerZip}</td>
-            <td>{bowler.bowlerPhoneNumber}</td>
+            <td>{`${bowler.bowlerFirstName || ''} ${bowler.bowlerMiddleInit || ''} ${bowler.bowlerLastName || ''}`}</td>
+            <td>{bowler.team?.teamName || ''}</td>
+            <td>{bowler.bowlerAddress || ''}</td>
+            <td>{bowler.bowlerCity || ''}</td>
+            <td>{bowler.bowlerState || ''}</td>
+            <td>{bowler.bowlerZip || ''}</td>
+            <td>{bowler.bowlerPhoneNumber || ''}</td>
           </tr>
         ))}
       </tbody>
